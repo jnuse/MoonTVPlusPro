@@ -206,6 +206,7 @@ function PlayPageClient() {
 
   // Anime4K超分相关状态
   const [webGPUSupported, setWebGPUSupported] = useState<boolean>(false);
+  const [gpuInfo, setGpuInfo] = useState<string>('未检测');
   const [anime4kEnabled, setAnime4kEnabled] = useState<boolean>(false);
   const [anime4kMode, setAnime4kMode] = useState<string>(() => {
     if (typeof window !== 'undefined') {
@@ -221,15 +222,24 @@ function PlayPageClient() {
     }
     return 2.0;
   });
+  const [gpuPreference, setGpuPreference] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      const v = localStorage.getItem('gpu_preference');
+      if (v !== null) return v;
+    }
+    return 'high-performance';
+  });
   const anime4kRef = useRef<any>(null);
   const anime4kEnabledRef = useRef(anime4kEnabled);
   const anime4kModeRef = useRef(anime4kMode);
   const anime4kScaleRef = useRef(anime4kScale);
+  const gpuPreferenceRef = useRef(gpuPreference);
   useEffect(() => {
     anime4kEnabledRef.current = anime4kEnabled;
     anime4kModeRef.current = anime4kMode;
     anime4kScaleRef.current = anime4kScale;
-  }, [anime4kEnabled, anime4kMode, anime4kScale]);
+    gpuPreferenceRef.current = gpuPreference;
+  }, [anime4kEnabled, anime4kMode, anime4kScale, gpuPreference]);
 
   // 检测WebGPU支持
   useEffect(() => {
@@ -241,17 +251,31 @@ function PlayPageClient() {
       }
 
       try {
-        const adapter = await (navigator as any).gpu.requestAdapter();
+        const adapter = await (navigator as any).gpu.requestAdapter({
+          powerPreference: gpuPreferenceRef.current
+        });
         if (!adapter) {
           setWebGPUSupported(false);
+          setGpuInfo('无法获取GPU');
           console.log('WebGPU不支持：无法获取GPU适配器');
           return;
         }
 
+        const adapterInfo = await adapter.requestAdapterInfo();
+        const info = adapterInfo.description || adapterInfo.device || `${adapterInfo.vendor} GPU`;
+        setGpuInfo(info);
         setWebGPUSupported(true);
         console.log('WebGPU支持检测：✅ 支持');
+        console.log('GPU信息:', {
+          vendor: adapterInfo.vendor,
+          architecture: adapterInfo.architecture,
+          device: adapterInfo.device,
+          description: adapterInfo.description,
+          powerPreference: gpuPreferenceRef.current
+        });
       } catch (err) {
         setWebGPUSupported(false);
+        setGpuInfo('检测失败');
         console.log('WebGPU不支持：', err);
       }
     };
@@ -1240,6 +1264,39 @@ function PlayPageClient() {
       }
     } catch (err) {
       console.error('更改超分倍数失败:', err);
+    }
+  };
+
+  // 更改GPU偏好
+  const changeGpuPreference = async (preference: string) => {
+    try {
+      setGpuPreference(preference);
+      localStorage.setItem('gpu_preference', preference);
+
+      // 重新检测GPU信息
+      try {
+        const adapter = await (navigator as any).gpu.requestAdapter({
+          powerPreference: preference
+        });
+        if (adapter) {
+          const adapterInfo = await adapter.requestAdapterInfo();
+          const info = adapterInfo.description || adapterInfo.device || `${adapterInfo.vendor} GPU`;
+          setGpuInfo(info);
+        }
+      } catch (err) {
+        console.error('获取GPU信息失败:', err);
+      }
+
+      if (artPlayerRef.current) {
+        artPlayerRef.current.notice.show = `GPU偏好已更改为: ${preference === 'high-performance' ? '高性能(独显)' : '低功耗(核显)'}`;
+      }
+
+      if (anime4kEnabledRef.current) {
+        await cleanupAnime4K();
+        await initAnime4K();
+      }
+    } catch (err) {
+      console.error('更改GPU偏好失败:', err);
     }
   };
 
@@ -2835,6 +2892,30 @@ function PlayPageClient() {
                 await changeAnime4KScale(parseFloat(item.value));
                 return item.html;
               },
+            },
+            {
+              name: 'GPU选择',
+              html: 'GPU选择',
+              selector: [
+                {
+                  html: '高性能(独显)',
+                  value: 'high-performance',
+                  default: gpuPreferenceRef.current === 'high-performance',
+                },
+                {
+                  html: '低功耗(核显)',
+                  value: 'low-power',
+                  default: gpuPreferenceRef.current === 'low-power',
+                },
+              ],
+              onSelect: async function (item: any) {
+                await changeGpuPreference(item.value);
+                return item.html;
+              },
+            },
+            {
+              name: '当前GPU',
+              html: `当前GPU: ${gpuInfo}`,
             }
           ] : []),
           {

@@ -10,7 +10,8 @@
       "WebFetch(domain:m.douban.com)",
       "WebFetch(domain:movie.douban.com)",
       "Bash(cat:*)",
-      "Bash(pnpm typecheck)"
+      "Bash(pnpm typecheck)",
+      "mcp__sequential-thinking__sequentialthinking"
     ],
     "deny": [],
     "ask": []
