@@ -56,33 +56,51 @@ export async function POST(request: NextRequest) {
         result,
       });
     } else {
-      // 测试所有启用的源
+      // 测试所有启用的源 - 使用流式响应
       const enabledSources = sourcePool.filter((s) => s.enabled);
 
       if (enabledSources.length === 0) {
         return NextResponse.json({ error: '没有启用的源' }, { status: 400 });
       }
 
-      await testMultipleSources(enabledSources, baseUrl);
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream({
+        async start(controller) {
+          let completed = 0;
+          const total = enabledSources.length;
 
-      // 更新所有缓存
-      if (updateCache) {
-        const uniqueKeyTypes = new Set<string>();
-        enabledSources.forEach((s) => {
-          s.keys.forEach((key) => {
-            uniqueKeyTypes.add(`${key}_${s.type}`);
-          });
-        });
+          for (const source of enabledSources) {
+            const result = await testVideoSource(source, baseUrl);
+            completed++;
 
-        for (const keyType of Array.from(uniqueKeyTypes)) {
-          const [key, type] = keyType.split('_');
-          await updateSourcePoolCache(key, type as 'video' | 'stream');
-        }
-      }
+            const progress = {
+              current: completed,
+              total,
+              source: { id: source.id, name: source.name },
+              result,
+            };
 
-      return NextResponse.json({
-        message: '批量测试完成',
-        total: enabledSources.length,
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(progress)}\n\n`));
+
+            // 更新缓存
+            if (updateCache && result.success) {
+              for (const key of source.keys) {
+                await updateSourcePoolCache(key, source.type);
+              }
+            }
+          }
+
+          controller.enqueue(encoder.encode('data: {"done":true}\n\n'));
+          controller.close();
+        },
+      });
+
+      return new Response(stream, {
+        headers: {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          Connection: 'keep-alive',
+        },
       });
     }
   } catch (error: any) {

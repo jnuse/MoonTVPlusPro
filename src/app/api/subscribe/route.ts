@@ -44,21 +44,29 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // 返回源列表（仅包含必要字段）
-    const result = sources.map((s) => ({
-      key: s.id,
-      name: s.name,
-      api: s.api,
-      latency: s.metrics?.latency,
-      quality: s.metrics?.quality,
-    }));
+    // 构造 api_site 对象
+    const apiSite: Record<string, { name: string; api: string; detail: string }> = {};
+    sources.forEach((s, index) => {
+      const apiKey = `api_${index + 1}`;
+      // 从 API URL 提取域名作为 detail
+      let detail = '';
+      try {
+        const url = new URL(s.api);
+        detail = `${url.protocol}//${url.host}`;
+      } catch {
+        detail = s.api;
+      }
+
+      apiSite[apiKey] = {
+        name: s.name,
+        api: s.api,
+        detail,
+      };
+    });
 
     return NextResponse.json({
-      key,
-      type,
-      count: result.length,
-      sources: result,
-      updatedAt: config.sourcePoolCache?.[`${key}_${type}`]?.updatedAt,
+      cache_time: await getCacheTime(),
+      api_site: apiSite,
     });
   } catch (error: any) {
     return NextResponse.json({ error: error.message || '服务器错误' }, { status: 500 });

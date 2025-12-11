@@ -100,12 +100,46 @@ export default function SourcePoolConfig() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id }),
       });
-      const data = await res.json();
-      if (res.ok) {
-        setMessage(data.message);
-        fetchSources();
+
+      if (id) {
+        // 单个测试，直接解析JSON
+        const data = await res.json();
+        if (res.ok) {
+          setMessage(data.message);
+          fetchSources();
+        } else {
+          setMessage(`错误: ${data.error}`);
+        }
       } else {
-        setMessage(`错误: ${data.error}`);
+        // 批量测试，处理流式响应
+        const reader = res.body?.getReader();
+        const decoder = new TextDecoder();
+        let completed = 0;
+        let total = 0;
+
+        if (reader) {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            const chunk = decoder.decode(value);
+            const lines = chunk.split('\n');
+
+            for (const line of lines) {
+              if (line.startsWith('data: ')) {
+                const data = JSON.parse(line.slice(6));
+                if (data.done) {
+                  setMessage(`测试完成: ${completed}/${total}`);
+                  fetchSources();
+                } else {
+                  completed = data.current;
+                  total = data.total;
+                  setMessage(`测试中: ${completed}/${total} - ${data.source.name}`);
+                }
+              }
+            }
+          }
+        }
       }
     } catch (error) {
       setMessage('测试失败');
