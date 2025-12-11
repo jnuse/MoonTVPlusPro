@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
           });
         });
 
-        for (const keyType of uniqueKeyTypes) {
+        for (const keyType of Array.from(uniqueKeyTypes)) {
           const [key, type] = keyType.split('_');
           await updateSourcePoolCache(key, type as 'video' | 'stream');
         }
