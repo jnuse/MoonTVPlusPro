@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Play, Trash2, Plus, Download } from 'lucide-react';
+import { Play, Trash2, Plus, Download, Edit2, Save, X } from 'lucide-react';
 
 import type { SourcePoolItem } from '@/types/source-pool.types';
 
@@ -11,6 +11,7 @@ const buttonStyles = {
   danger: 'px-3 py-1.5 text-sm font-medium bg-red-600 hover:bg-red-700 text-white rounded-lg',
   dangerSmall: 'px-2 py-1 text-xs font-medium bg-red-600 hover:bg-red-700 text-white rounded-md',
   successSmall: 'px-2 py-1 text-xs font-medium bg-green-600 hover:bg-green-700 text-white rounded-md',
+  primarySmall: 'px-2 py-1 text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-md',
 };
 
 export default function SourcePoolConfig() {
@@ -18,12 +19,21 @@ export default function SourcePoolConfig() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [formData, setFormData] = useState({
     name: '',
     api: '',
     type: 'video' as 'video' | 'stream',
     keys: 'normal',
     testKeyword: '斗罗大陆',
+  });
+  const [editFormData, setEditFormData] = useState({
+    name: '',
+    api: '',
+    type: 'video' as 'video' | 'stream',
+    keys: '',
+    testKeyword: '',
   });
 
   const fetchSources = async () => {
@@ -136,6 +146,105 @@ export default function SourcePoolConfig() {
     }
   };
 
+  const handleEdit = (source: SourcePoolItem) => {
+    setEditingId(source.id);
+    setEditFormData({
+      name: source.name,
+      api: source.api,
+      type: source.type,
+      keys: source.keys.join(', '),
+      testKeyword: source.testKeyword,
+    });
+  };
+
+  const handleSaveEdit = async (id: string) => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/admin/source-pool/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...editFormData,
+          keys: editFormData.keys.split(',').map((k) => k.trim()),
+        }),
+      });
+      if (res.ok) {
+        setMessage('更新成功');
+        setEditingId(null);
+        fetchSources();
+      } else {
+        const data = await res.json();
+        setMessage(`错误: ${data.error}`);
+      }
+    } catch (error) {
+      setMessage('更新失败');
+    }
+    setLoading(false);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingId(null);
+  };
+
+  const handleSelectAll = () => {
+    if (selectedIds.size === sources.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(sources.map((s) => s.id)));
+    }
+  };
+
+  const handleSelect = (id: string) => {
+    const newSelected = new Set(selectedIds);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
+    }
+    setSelectedIds(newSelected);
+  };
+
+  const handleBatchToggle = async (enabled: boolean) => {
+    if (selectedIds.size === 0) return;
+    setLoading(true);
+    let success = 0;
+    for (const id of selectedIds) {
+      try {
+        const res = await fetch(`/api/admin/source-pool/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ enabled }),
+        });
+        if (res.ok) success++;
+      } catch (error) {
+        console.error('批量操作失败', error);
+      }
+    }
+    setMessage(`批量${enabled ? '启用' : '禁用'}完成: ${success}/${selectedIds.size}`);
+    setSelectedIds(new Set());
+    fetchSources();
+    setLoading(false);
+  };
+
+  const handleBatchDelete = async () => {
+    if (selectedIds.size === 0) return;
+    if (!confirm(`确认删除选中的 ${selectedIds.size} 个源？`)) return;
+    setLoading(true);
+    let success = 0;
+    for (const id of selectedIds) {
+      try {
+        const res = await fetch(`/api/admin/source-pool/${id}`, { method: 'DELETE' });
+        if (res.ok) success++;
+      } catch (error) {
+        console.error('批量删除失败', error);
+      }
+    }
+    setMessage(`批量删除完成: ${success}/${selectedIds.size}`);
+    setSelectedIds(new Set());
+    fetchSources();
+    setLoading(false);
+  };
+
   return (
     <div className="space-y-4">
       {message && (
@@ -144,7 +253,7 @@ export default function SourcePoolConfig() {
         </div>
       )}
 
-      <div className="flex gap-2">
+      <div className="flex gap-2 flex-wrap">
         <button onClick={() => setShowAddForm(!showAddForm)} className={buttonStyles.success}>
           <Plus className="inline w-4 h-4 mr-1" />
           添加源
@@ -157,6 +266,19 @@ export default function SourcePoolConfig() {
           <Download className="inline w-4 h-4 mr-1" />
           从配置导入
         </button>
+        {selectedIds.size > 0 && (
+          <>
+            <button onClick={() => handleBatchToggle(true)} disabled={loading} className={buttonStyles.success}>
+              批量启用 ({selectedIds.size})
+            </button>
+            <button onClick={() => handleBatchToggle(false)} disabled={loading} className={buttonStyles.primary}>
+              批量禁用 ({selectedIds.size})
+            </button>
+            <button onClick={handleBatchDelete} disabled={loading} className={buttonStyles.danger}>
+              批量删除 ({selectedIds.size})
+            </button>
+          </>
+        )}
       </div>
 
       {showAddForm && (
@@ -212,9 +334,18 @@ export default function SourcePoolConfig() {
         <table className="w-full text-sm">
           <thead className="bg-gray-100 dark:bg-gray-800">
             <tr>
+              <th className="p-2">
+                <input
+                  type="checkbox"
+                  checked={selectedIds.size === sources.length && sources.length > 0}
+                  onChange={handleSelectAll}
+                  className="cursor-pointer"
+                />
+              </th>
               <th className="p-2 text-left">名称</th>
               <th className="p-2 text-left">类型</th>
               <th className="p-2 text-left">标签</th>
+              <th className="p-2 text-left">测试关键词</th>
               <th className="p-2 text-left">状态</th>
               <th className="p-2 text-left">延迟</th>
               <th className="p-2 text-left">画质</th>
@@ -224,29 +355,103 @@ export default function SourcePoolConfig() {
           <tbody>
             {sources.map((s) => (
               <tr key={s.id} className="border-b dark:border-gray-700">
-                <td className="p-2">{s.name}</td>
-                <td className="p-2">{s.type === 'video' ? '视频' : '直播'}</td>
-                <td className="p-2">{s.keys.join(', ')}</td>
                 <td className="p-2">
-                  <button
-                    onClick={() => handleToggle(s.id, s.enabled)}
-                    className={s.enabled ? buttonStyles.successSmall : buttonStyles.dangerSmall}
-                  >
-                    {s.enabled ? '启用' : '禁用'}
-                  </button>
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.has(s.id)}
+                    onChange={() => handleSelect(s.id)}
+                    className="cursor-pointer"
+                  />
                 </td>
-                <td className="p-2">{s.metrics?.latency ? `${s.metrics.latency}ms` : '-'}</td>
-                <td className="p-2">{s.metrics?.quality || '-'}</td>
-                <td className="p-2">
-                  <div className="flex gap-1">
-                    <button onClick={() => handleTest(s.id)} className={buttonStyles.successSmall}>
-                      测试
-                    </button>
-                    <button onClick={() => handleDelete(s.id)} className={buttonStyles.dangerSmall}>
-                      <Trash2 className="w-3 h-3" />
-                    </button>
-                  </div>
-                </td>
+                {editingId === s.id ? (
+                  <>
+                    <td className="p-2">
+                      <input
+                        type="text"
+                        value={editFormData.name}
+                        onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                        className="w-full p-1 text-xs rounded bg-white dark:bg-gray-700"
+                      />
+                    </td>
+                    <td className="p-2">
+                      <select
+                        value={editFormData.type}
+                        onChange={(e) => setEditFormData({ ...editFormData, type: e.target.value as any })}
+                        className="w-full p-1 text-xs rounded bg-white dark:bg-gray-700"
+                      >
+                        <option value="video">视频</option>
+                        <option value="stream">直播</option>
+                      </select>
+                    </td>
+                    <td className="p-2">
+                      <input
+                        type="text"
+                        value={editFormData.keys}
+                        onChange={(e) => setEditFormData({ ...editFormData, keys: e.target.value })}
+                        className="w-full p-1 text-xs rounded bg-white dark:bg-gray-700"
+                        placeholder="逗号分隔"
+                      />
+                    </td>
+                    <td className="p-2">
+                      <input
+                        type="text"
+                        value={editFormData.testKeyword}
+                        onChange={(e) => setEditFormData({ ...editFormData, testKeyword: e.target.value })}
+                        className="w-full p-1 text-xs rounded bg-white dark:bg-gray-700"
+                      />
+                    </td>
+                    <td className="p-2">
+                      <button
+                        onClick={() => handleToggle(s.id, s.enabled)}
+                        className={s.enabled ? buttonStyles.successSmall : buttonStyles.dangerSmall}
+                      >
+                        {s.enabled ? '启用' : '禁用'}
+                      </button>
+                    </td>
+                    <td className="p-2">{s.metrics?.latency ? `${s.metrics.latency}ms` : '-'}</td>
+                    <td className="p-2">{s.metrics?.quality || '-'}</td>
+                    <td className="p-2">
+                      <div className="flex gap-1">
+                        <button onClick={() => handleSaveEdit(s.id)} className={buttonStyles.successSmall}>
+                          <Save className="w-3 h-3" />
+                        </button>
+                        <button onClick={handleCancelEdit} className={buttonStyles.dangerSmall}>
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </td>
+                  </>
+                ) : (
+                  <>
+                    <td className="p-2">{s.name}</td>
+                    <td className="p-2">{s.type === 'video' ? '视频' : '直播'}</td>
+                    <td className="p-2">{s.keys.join(', ')}</td>
+                    <td className="p-2">{s.testKeyword}</td>
+                    <td className="p-2">
+                      <button
+                        onClick={() => handleToggle(s.id, s.enabled)}
+                        className={s.enabled ? buttonStyles.successSmall : buttonStyles.dangerSmall}
+                      >
+                        {s.enabled ? '启用' : '禁用'}
+                      </button>
+                    </td>
+                    <td className="p-2">{s.metrics?.latency ? `${s.metrics.latency}ms` : '-'}</td>
+                    <td className="p-2">{s.metrics?.quality || '-'}</td>
+                    <td className="p-2">
+                      <div className="flex gap-1">
+                        <button onClick={() => handleEdit(s)} className={buttonStyles.primarySmall}>
+                          <Edit2 className="w-3 h-3" />
+                        </button>
+                        <button onClick={() => handleTest(s.id)} className={buttonStyles.successSmall}>
+                          测试
+                        </button>
+                        <button onClick={() => handleDelete(s.id)} className={buttonStyles.dangerSmall}>
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </td>
+                  </>
+                )}
               </tr>
             ))}
           </tbody>
