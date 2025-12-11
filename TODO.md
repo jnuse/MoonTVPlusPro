@@ -210,3 +210,35 @@ interface SourcePoolItem {
 - [ ] 添加源测试历史记录
 - [x] 支持批量编辑源标签（已完成）
 - [ ] 添加源性能趋势图表
+
+
+🚀 启动步骤
+
+1. 启动 Kvrocks
+
+docker-compose -f docker-compose.dev.yml up -d
+
+2. 安装依赖（如果还没安装）
+
+pnpm install
+
+3. 启动开发服务器
+
+pnpm dev
+
+4. 访问应用
+
+- 前端：http://localhost:3000
+- 管理后台：http://localhost:3000/admin
+- 登录账号：admin / admin123
+
+🔧 常用命令
+
+# 查看 Kvrocks 日志
+docker-compose -f docker-compose.dev.yml logs -f
+
+# 停止 Kvrocks
+docker-compose -f docker-compose.dev.yml down
+
+# 停止并删除数据（重置）
+docker-compose -f docker-compose.dev.yml down -v

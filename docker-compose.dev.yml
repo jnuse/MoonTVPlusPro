@@ -1,0 +1,12 @@
+services:
+  kvrocks:
+    image: apache/kvrocks:latest
+    container_name: moontv-kvrocks-dev
+    ports:
+      - "6666:6666"
+    volumes:
+      - kvrocks-data:/var/lib/kvrocks
+    restart: unless-stopped
+
+volumes:
+  kvrocks-data:
