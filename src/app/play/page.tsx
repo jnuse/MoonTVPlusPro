@@ -254,6 +254,7 @@ function PlayPageClient() {
         const adapter = await (navigator as any).gpu.requestAdapter({
           powerPreference: gpuPreferenceRef.current
         });
+        console.log('[WebGPU Adapter] src/app/play/page.tsx:254', adapter);
         if (!adapter) {
           setWebGPUSupported(false);
           setGpuInfo('无法获取GPU');
@@ -1284,6 +1285,7 @@ function PlayPageClient() {
         const adapter = await (navigator as any).gpu.requestAdapter({
           powerPreference: preference
         });
+        console.log('[WebGPU Adapter] src/app/play/page.tsx:1284', adapter);
         if (adapter) {
           if (typeof adapter.requestAdapterInfo === 'function') {
             const adapterInfo = await adapter.requestAdapterInfo();
