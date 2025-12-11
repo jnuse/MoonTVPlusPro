@@ -261,18 +261,24 @@ function PlayPageClient() {
           return;
         }
 
-        const adapterInfo = await adapter.requestAdapterInfo();
-        const info = adapterInfo.description || adapterInfo.device || `${adapterInfo.vendor} GPU`;
-        setGpuInfo(info);
         setWebGPUSupported(true);
+
+        // 尝试获取GPU信息（可能不支持）
+        try {
+          if (typeof adapter.requestAdapterInfo === 'function') {
+            const adapterInfo = await adapter.requestAdapterInfo();
+            const info = adapterInfo.description || adapterInfo.device || `${adapterInfo.vendor} GPU`;
+            setGpuInfo(info);
+            console.log('GPU信息:', adapterInfo);
+          } else {
+            setGpuInfo('已支持(详细信息不可用)');
+          }
+        } catch (infoErr) {
+          setGpuInfo('已支持(详细信息不可用)');
+          console.log('无法获取GPU详细信息:', infoErr);
+        }
+
         console.log('WebGPU支持检测：✅ 支持');
-        console.log('GPU信息:', {
-          vendor: adapterInfo.vendor,
-          architecture: adapterInfo.architecture,
-          device: adapterInfo.device,
-          description: adapterInfo.description,
-          powerPreference: gpuPreferenceRef.current
-        });
       } catch (err) {
         setWebGPUSupported(false);
         setGpuInfo('检测失败');
@@ -1279,9 +1285,13 @@ function PlayPageClient() {
           powerPreference: preference
         });
         if (adapter) {
-          const adapterInfo = await adapter.requestAdapterInfo();
-          const info = adapterInfo.description || adapterInfo.device || `${adapterInfo.vendor} GPU`;
-          setGpuInfo(info);
+          if (typeof adapter.requestAdapterInfo === 'function') {
+            const adapterInfo = await adapter.requestAdapterInfo();
+            const info = adapterInfo.description || adapterInfo.device || `${adapterInfo.vendor} GPU`;
+            setGpuInfo(info);
+          } else {
+            setGpuInfo('已支持(详细信息不可用)');
+          }
         }
       } catch (err) {
         console.error('获取GPU信息失败:', err);
