@@ -78,54 +78,12 @@ jobs:
           digest="${{ steps.build.outputs.digest }}"
           touch "/tmp/digests/${digest#sha256:}"
 
-      - name: Get image size
-        id: size
-        run: |
-          # 获取刚推送的镜像大小
-          IMAGE_REF="ghcr.io/jnuse/moontvpluspro@${{ steps.build.outputs.digest }}"
-          
-          # 使用 docker buildx imagetools inspect 获取镜像信息
-          MANIFEST=$(docker buildx imagetools inspect --raw $IMAGE_REF)
-          
-          # 计算总大小
-          TOTAL_SIZE=$(echo "$MANIFEST" | jq '[.layers[]?.size // 0, .config.size // 0] | add // 0')
-          
-          # 转换为人类可读格式
-          if [ "$TOTAL_SIZE" -ge 1073741824 ]; then
-            SIZE_HUMAN=$(awk "BEGIN {printf \"%.2f GB\", $TOTAL_SIZE/1073741824}")
-          elif [ "$TOTAL_SIZE" -ge 1048576 ]; then
-            SIZE_HUMAN=$(awk "BEGIN {printf \"%.2f MB\", $TOTAL_SIZE/1048576}")
-          elif [ "$TOTAL_SIZE" -ge 1024 ]; then
-            SIZE_HUMAN=$(awk "BEGIN {printf \"%.2f KB\", $TOTAL_SIZE/1024}")
-          else
-            SIZE_HUMAN="${TOTAL_SIZE} bytes"
-          fi
-          
-          echo "size_bytes=$TOTAL_SIZE" >> $GITHUB_OUTPUT
-          echo "size_human=$SIZE_HUMAN" >> $GITHUB_OUTPUT
-          echo "platform=${{ matrix.platform }}" >> $GITHUB_OUTPUT
-          
-          echo "📦 Image size for ${{ matrix.platform }}: $SIZE_HUMAN ($TOTAL_SIZE bytes)"
-
-      - name: Upload digest and size info
+      - name: Upload digest
         uses: actions/upload-artifact@v4
         with:
           name: digests-${{ env.PLATFORM_NAME }}
           path: /tmp/digests/*
           if-no-files-found: error
-          retention-days: 1
-
-      - name: Save size metadata
-        run: |
-          mkdir -p /tmp/sizes
-          echo "${{ steps.size.outputs.size_human }}" > "/tmp/sizes/${{ env.PLATFORM_NAME }}.txt"
-          echo "${{ steps.size.outputs.size_bytes }}" > "/tmp/sizes/${{ env.PLATFORM_NAME }}.bytes"
-
-      - name: Upload size metadata
-        uses: actions/upload-artifact@v4
-        with:
-          name: sizes-${{ env.PLATFORM_NAME }}
-          path: /tmp/sizes/*
           retention-days: 1
 
   merge:
@@ -138,13 +96,6 @@ jobs:
         with:
           path: /tmp/digests
           pattern: digests-*
-          merge-multiple: true
-
-      - name: Download size metadata
-        uses: actions/download-artifact@v4
-        with:
-          path: /tmp/sizes
-          pattern: sizes-*
           merge-multiple: true
 
       - name: Set up Docker Buildx
@@ -161,60 +112,15 @@ jobs:
         id: lowercase
         run: echo "owner=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
 
-      - name: Prepare size annotations
-        id: annotations
-        run: |
-          cd /tmp/sizes
-          
-          # 读取各架构大小
-          AMD64_SIZE=$(cat linux-amd64.txt 2>/dev/null || echo "N/A")
-          ARM64_SIZE=$(cat linux-arm64.txt 2>/dev/null || echo "N/A")
-          
-          AMD64_BYTES=$(cat linux-amd64.bytes 2>/dev/null || echo "0")
-          ARM64_BYTES=$(cat linux-arm64.bytes 2>/dev/null || echo "0")
-          
-          # 计算总大小
-          TOTAL_BYTES=$((AMD64_BYTES + ARM64_BYTES))
-          if [ "$TOTAL_BYTES" -ge 1073741824 ]; then
-            TOTAL_SIZE=$(awk "BEGIN {printf \"%.2f GB\", $TOTAL_BYTES/1073741824}")
-          elif [ "$TOTAL_BYTES" -ge 1048576 ]; then
-            TOTAL_SIZE=$(awk "BEGIN {printf \"%.2f MB\", $TOTAL_BYTES/1048576}")
-          else
-            TOTAL_SIZE=$(awk "BEGIN {printf \"%.2f KB\", $TOTAL_BYTES/1024}")
-          fi
-          
-          # 生成描述
-          DESCRIPTION="Multi-arch Docker image | amd64: ${AMD64_SIZE} | arm64: ${ARM64_SIZE} | Total: ${TOTAL_SIZE}"
-          
-          echo "description=$DESCRIPTION" >> $GITHUB_OUTPUT
-          echo "amd64_size=$AMD64_SIZE" >> $GITHUB_OUTPUT
-          echo "arm64_size=$ARM64_SIZE" >> $GITHUB_OUTPUT
-          echo "total_size=$TOTAL_SIZE" >> $GITHUB_OUTPUT
-          
-          echo "📊 Image sizes:"
-          echo "  - linux/amd64: $AMD64_SIZE"
-          echo "  - linux/arm64: $ARM64_SIZE"
-          echo "  - Total: $TOTAL_SIZE"
-
-      - name: Create manifest list with annotations
+      - name: Create manifest list
         working-directory: /tmp/digests
         run: |
-          # 创建带注解的 manifest
           docker buildx imagetools create \
-            --annotation "index:org.opencontainers.image.description=${{ steps.annotations.outputs.description }}" \
-            --annotation "index:org.opencontainers.image.size.amd64=${{ steps.annotations.outputs.amd64_size }}" \
-            --annotation "index:org.opencontainers.image.size.arm64=${{ steps.annotations.outputs.arm64_size }}" \
-            --annotation "index:org.opencontainers.image.size.total=${{ steps.annotations.outputs.total_size }}" \
             --annotation "index:org.opencontainers.image.source=https://github.com/${{ github.repository }}" \
             --annotation "index:org.opencontainers.image.revision=${{ github.sha }}" \
             --annotation "index:org.opencontainers.image.created=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
             -t ghcr.io/jnuse/moontvpluspro:${{ github.event.inputs.tag || 'latest' }} \
             $(printf 'ghcr.io/jnuse/moontvpluspro@sha256:%s ' *)
-
-      - name: Verify annotations
-        run: |
-          echo "🔍 Verifying manifest annotations..."
-          docker buildx imagetools inspect ghcr.io/jnuse/moontvpluspro:${{ github.event.inputs.tag || 'latest' }}
 
   cleanup-refresh:
     runs-on: ubuntu-latest
