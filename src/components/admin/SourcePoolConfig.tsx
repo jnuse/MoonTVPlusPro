@@ -208,7 +208,7 @@ export default function SourcePoolConfig() {
     if (selectedIds.size === 0) return;
     setLoading(true);
     let success = 0;
-    for (const id of selectedIds) {
+    for (const id of Array.from(selectedIds)) {
       try {
         const res = await fetch(`/api/admin/source-pool/${id}`, {
           method: 'PUT',
@@ -231,7 +231,7 @@ export default function SourcePoolConfig() {
     if (!confirm(`确认删除选中的 ${selectedIds.size} 个源？`)) return;
     setLoading(true);
     let success = 0;
-    for (const id of selectedIds) {
+    for (const id of Array.from(selectedIds)) {
       try {
         const res = await fetch(`/api/admin/source-pool/${id}`, { method: 'DELETE' });
         if (res.ok) success++;
