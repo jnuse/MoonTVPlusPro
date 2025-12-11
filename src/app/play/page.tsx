@@ -2922,10 +2922,6 @@ function PlayPageClient() {
                 await changeGpuPreference(item.value);
                 return item.html;
               },
-            },
-            {
-              name: '当前GPU',
-              html: `当前GPU: ${gpuInfo}`,
             }
           ] : []),
           {
