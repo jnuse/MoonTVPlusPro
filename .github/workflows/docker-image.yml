@@ -9,9 +9,7 @@ on:
         default: 'latest'
         type: string
   push:
-    branches: [ main, master ]
-  pull_request:
-    branches: [ main, master ]
+    branches: [ dev]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -59,7 +57,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/mtvpls/moontvplus
+          images: ghcr.io/jnuse/moontvpluspro
           tags: |
             type=raw,value=${{ github.event.inputs.tag || 'latest' }},enable={{is_default_branch}}
 
@@ -71,8 +69,8 @@ jobs:
           file: ./Dockerfile
           platforms: ${{ matrix.platform }}
           labels: ${{ steps.meta.outputs.labels }}
-          tags: ghcr.io/mtvpls/moontvplus:${{ github.event.inputs.tag || 'latest' }}
-          outputs: type=image,name=ghcr.io/mtvpls/moontvplus,name-canonical=true,push=true
+          tags: ghcr.io/jnuse/moontvpluspro:${{ github.event.inputs.tag || 'latest' }}
+          outputs: type=image,name=ghcr.io/jnuse/moontvpluspro,name-canonical=true,push=true
 
       - name: Export digest
         run: |
@@ -84,7 +82,7 @@ jobs:
         id: size
         run: |
           # 获取刚推送的镜像大小
-          IMAGE_REF="ghcr.io/mtvpls/moontvplus@${{ steps.build.outputs.digest }}"
+          IMAGE_REF="ghcr.io/jnuse/moontvpluspro@${{ steps.build.outputs.digest }}"
           
           # 使用 docker buildx imagetools inspect 获取镜像信息
           MANIFEST=$(docker buildx imagetools inspect --raw $IMAGE_REF)
@@ -210,13 +208,13 @@ jobs:
             --annotation "index:org.opencontainers.image.source=https://github.com/${{ github.repository }}" \
             --annotation "index:org.opencontainers.image.revision=${{ github.sha }}" \
             --annotation "index:org.opencontainers.image.created=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
-            -t ghcr.io/mtvpls/moontvplus:${{ github.event.inputs.tag || 'latest' }} \
-            $(printf 'ghcr.io/mtvpls/moontvplus@sha256:%s ' *)
+            -t ghcr.io/jnuse/moontvpluspro:${{ github.event.inputs.tag || 'latest' }} \
+            $(printf 'ghcr.io/jnuse/moontvpluspro@sha256:%s ' *)
 
       - name: Verify annotations
         run: |
           echo "🔍 Verifying manifest annotations..."
-          docker buildx imagetools inspect ghcr.io/mtvpls/moontvplus:${{ github.event.inputs.tag || 'latest' }}
+          docker buildx imagetools inspect ghcr.io/jnuse/moontvpluspro:${{ github.event.inputs.tag || 'latest' }}
 
   cleanup-refresh:
     runs-on: ubuntu-latest
