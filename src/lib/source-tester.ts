@@ -66,17 +66,17 @@ export async function testVideoSource(
   const startTime = Date.now();
 
   try {
-    // 构造搜索 URL
-    const searchUrl = `${baseUrl}/api/search?q=${encodeURIComponent(source.testKeyword)}&site=${source.id}`;
+    // 直接调用源的API
+    const apiUrl = `${source.api}?wd=${encodeURIComponent(source.testKeyword)}`;
 
     // 使用 AbortController 实现 30 秒超时
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-    const response = await fetch(searchUrl, {
+    const response = await fetch(apiUrl, {
       signal: controller.signal,
       headers: {
-        'Content-Type': 'application/json',
+        'User-Agent': 'Mozilla/5.0',
       },
     });
 
@@ -90,7 +90,7 @@ export async function testVideoSource(
     const latency = Date.now() - startTime;
 
     // 解析结果并计算平均画质分数
-    const results = data.results || [];
+    const results = data.list || [];
     if (results.length === 0) {
       return {
         latency,
