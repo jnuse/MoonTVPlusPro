@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-import { getConfig } from '@/lib/config';
+import { getConfig, getCacheTime } from '@/lib/config';
 import { getCachedSources } from '@/lib/source-pool';
 
 export const runtime = 'nodejs';

@@ -134,10 +134,79 @@ interface SourcePoolItem {
 - `src/components/admin/SourcePoolConfig.tsx`
 - `src/app/admin/page.tsx`（已集成）
 
+## 改进记录
+
+### 2025-12-11 功能增强 ✅
+
+**执行者：** Claude Code
+
+#### 1. 修复订阅API认证问题
+- **问题**：`/api/subscribe` 返回401错误
+- **原因**：middleware未将此路由添加到公开路由列表
+- **修复**：`src/middleware.ts:136` - 添加 `api/subscribe` 到排除列表
+
+#### 2. 源管理界面增强
+**文件**：`src/components/admin/SourcePoolConfig.tsx`
+
+- ✅ **编辑功能**：点击编辑按钮可修改源的所有字段（名称、类型、标签、测试关键词）
+- ✅ **显示测试关键词**：表格新增"测试关键词"列
+- ✅ **批量操作**：
+  - 全选/单选复选框
+  - 批量启用/禁用/删除
+  - 显示选中数量
+- ✅ **修复TypeScript错误**：使用 `Array.from()` 转换Set迭代
+
+#### 3. 测试功能优化
+**文件**：`src/lib/source-tester.ts:70`
+
+- **问题**：测试调用本地 `/api/search` 导致401错误
+- **修复**：直接调用源API（`{source.api}?wd={keyword}`），不依赖本地认证
+- **好处**：测试更准确，直接反映源的真实响应
+
+#### 4. 实时测试进度
+**文件**：
+- `src/app/api/admin/source-pool/test/route.ts:59-104`
+- `src/components/admin/SourcePoolConfig.tsx:94-148`
+
+- **问题**：批量测试超时（504 Gateway Timeout），无进度反馈
+- **修复**：使用Server-Sent Events (SSE)流式响应
+- **效果**：实时显示"测试中: 3/10 - 源名称"，避免超时
+
+#### 5. 订阅API格式调整
+**文件**：`src/app/api/subscribe/route.ts`
+
+**旧格式**：
+```json
+{
+  "key": "normal",
+  "type": "video",
+  "count": 10,
+  "sources": [...],
+  "updatedAt": 1702300000000
+}
+```
+
+**新格式**：
+```json
+{
+  "cache_time": 7200,
+  "api_site": {
+    "api_1": {
+      "name": "源名称",
+      "api": "https://example.com/api.php/provide/vod",
+      "detail": "https://example.com"
+    }
+  }
+}
+```
+
+- `detail` 字段自动从API URL提取域名
+- 兼容配置文件格式，便于集成
+
 ## 后续改进建议
 
 - [ ] 添加定时自动测试功能
 - [ ] 支持自定义画质评分规则
 - [ ] 添加源测试历史记录
-- [ ] 支持批量编辑源标签
+- [x] 支持批量编辑源标签（已完成）
 - [ ] 添加源性能趋势图表
