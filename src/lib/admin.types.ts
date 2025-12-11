@@ -1,3 +1,5 @@
+import type { SourcePoolItem, SourcePoolCache } from '@/types/source-pool.types';
+
 export interface AdminConfig {
   ConfigSubscribtion: {
     URL: string;
@@ -63,6 +65,9 @@ export interface AdminConfig {
     channelNumber?: number;
     disabled?: boolean;
   }[];
+  // 源池子管理
+  sourcePool?: SourcePoolItem[];
+  sourcePoolCache?: SourcePoolCache;
 }
 
 export interface AdminConfigResult {

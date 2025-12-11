@@ -46,6 +46,7 @@ import { getAuthInfoFromBrowserCookie } from '@/lib/auth';
 
 import DataMigration from '@/components/DataMigration';
 import PageLayout from '@/components/PageLayout';
+import SourcePoolConfig from '@/components/admin/SourcePoolConfig';
 
 // 统一按钮样式系统
 const buttonStyles = {
@@ -5869,6 +5870,7 @@ function AdminPageClient() {
     configFile: false,
     dataMigration: false,
     customAdFilter: false,
+    sourcePool: false,
   });
 
   // 获取管理员配置
@@ -6099,6 +6101,23 @@ function AdminPageClient() {
                 refreshConfig={fetchConfig}
               />
             </CollapsibleTab>
+
+            {/* 源池子管理标签 - 仅站长可见 */}
+            {role === 'owner' && (
+              <CollapsibleTab
+                title='源池子管理'
+                icon={
+                  <Database
+                    size={20}
+                    className='text-gray-600 dark:text-gray-400'
+                  />
+                }
+                isExpanded={expandedTabs.sourcePool}
+                onToggle={() => toggleTab('sourcePool')}
+              >
+                <SourcePoolConfig />
+              </CollapsibleTab>
+            )}
 
             {/* 数据迁移标签 - 仅站长可见 */}
             {role === 'owner' && (
